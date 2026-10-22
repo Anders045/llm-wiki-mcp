@@ -1,3 +1,5 @@
+import { posix, relative, sep } from 'node:path';
+import { safePath } from '../utils/safe-path.js';
 import type { SearchProvider } from '../search/search-provider.js';
 import type { SearchResult } from '../config/types.js';
 
@@ -17,6 +19,7 @@ export async function handleSearch(
   input: SearchInput,
   searchProvider: SearchProvider,
   wikiDir: string,
+  wikiRelativePath: string,
 ): Promise<SearchOutput> {
   const maxResults = input.max_results ?? 10;
 
@@ -25,5 +28,13 @@ export async function handleSearch(
     wikiDir,
   });
 
-  return { results };
+  return {
+    results: results.map((result) => ({
+      ...result,
+      path: posix.join(
+        wikiRelativePath,
+        relative(wikiDir, safePath(wikiDir, result.path)).split(sep).join('/'),
+      ),
+    })),
+  };
 }

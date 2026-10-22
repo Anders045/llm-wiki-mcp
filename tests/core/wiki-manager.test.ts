@@ -108,7 +108,11 @@ updated: 2026-04-06
 
 Version 2.`;
 
-    const result = await manager.updatePage('wiki/mutable.md', updated);
+    const result = await manager.updatePage(
+      'wiki/mutable.md',
+      updated,
+      (await manager.readPage({ path: 'wiki/mutable.md' })).version,
+    );
     expect(result.success).toBe(true);
 
     const page = await manager.readPage({ path: 'wiki/mutable.md' });
@@ -139,7 +143,10 @@ Standalone page.`;
     await manager.createPage('Page A', pageA, 'concept');
     await manager.createPage('Page B', pageB, 'concept');
 
-    const result = await manager.deletePage('wiki/page-b.md');
+    const result = await manager.deletePage(
+      'wiki/page-b.md',
+      (await manager.readPage({ path: 'wiki/page-b.md' })).version,
+    );
     expect(result.success).toBe(true);
     expect(result.brokenLinks).toContain('wiki/page-a.md');
     expect(existsSync(join(TEST_DIR, 'wiki/page-b.md'))).toBe(false);

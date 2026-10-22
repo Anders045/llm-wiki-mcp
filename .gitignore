@@ -12,3 +12,6 @@ coverage/
 # Skills (local only)
 .claude/
 skills-lock.json
+
+# Local fork build and verification artifacts
+artifacts/

@@ -4,7 +4,8 @@ import { LinkResolver } from './core/link-resolver.js';
 import { LogManager } from './core/log-manager.js';
 import { IndexManager } from './core/index-manager.js';
 import { WikiManager } from './core/wiki-manager.js';
-import { detectSearchProvider } from './search/detect.js';
+import { SimpleProvider } from './search/simple-provider.js';
+import { VERSION, PACKAGE_NAME } from './version.js';
 import { registerTools } from './tools/index.js';
 
 /** Configuration required to spin up an MCP server instance. */
@@ -30,12 +31,12 @@ export async function createServer(config: ServerConfig): Promise<McpServer> {
   const indexManager = new IndexManager(vaultPath, linkResolver);
   const wikiManager = new WikiManager(vaultPath, schema, linkResolver, indexManager, logManager);
 
-  // Pick the best available full-text search backend (e.g., ripgrep)
-  const searchProvider = await detectSearchProvider();
+  // Keep the accepted local search behavior independent of PATH.
+  const searchProvider = new SimpleProvider();
 
   const server = new McpServer({
-    name: 'llm-wiki-mcp',
-    version: '0.1.0',
+    name: PACKAGE_NAME,
+    version: VERSION,
   });
 
   // Expose all wiki tools (create, read, update, delete, search, etc.)

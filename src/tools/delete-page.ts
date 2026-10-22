@@ -3,6 +3,7 @@ import type { WikiManager } from '../core/wiki-manager.js';
 /** Parameters for deleting an existing wiki page. */
 interface DeletePageInput {
   path: string;
+  expectedVersion?: string;
 }
 
 /**
@@ -12,6 +13,7 @@ interface DeletePageInput {
 export async function handleDeletePage(
   input: DeletePageInput,
   wikiManager: WikiManager,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; message: string; brokenLinks: string[] }> {
-  return wikiManager.deletePage(input.path);
+  return wikiManager.deletePage(input.path, input.expectedVersion, signal);
 }

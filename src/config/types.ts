@@ -97,11 +97,13 @@ export interface SearchOptions {
 
 /** Represents a wiki page read from disk, including its parsed frontmatter. */
 export interface PageData {
+  /** SHA-256 revision required by update/delete. */
+  version: string;
   /** Full Markdown content (including frontmatter block). */
   content: string;
   /** Parsed YAML frontmatter as key-value pairs. */
   frontmatter: Record<string, unknown>;
-  /** Relative path of the page within the wiki directory. */
+  /** Relative path of the page from the vault root. */
   path: string;
 }
 
