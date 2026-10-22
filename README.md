@@ -1,3 +1,5 @@
+> **Nora personal-wiki fork:** this checkout builds the private package `@anders045/llm-wiki-mcp@0.2.1-nora.1`. Install a reviewed fixed tarball; the upstream npm commands below do not include this fork. Use stdio and read [FORK-NOTES.md](FORK-NOTES.md) for the required version parameter on updates/deletes, Chinese filenames, path boundaries and recovery procedure. Original upstream documentation follows for provenance.
+
 # llm-wiki-mcp
 
 [![npm version](https://img.shields.io/npm/v/llm-wiki-mcp.svg)](https://www.npmjs.com/package/llm-wiki-mcp)

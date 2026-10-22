@@ -56,13 +56,13 @@ describe('LinkResolver — markdown mode', () => {
     expect(links).toEqual([
       {
         raw: '[Transformer Architecture](wiki/transformer-architecture.md)',
-        target: 'Transformer Architecture',
-        displayText: undefined,
+        target: 'wiki/transformer-architecture.md',
+        displayText: 'Transformer Architecture',
       },
       {
         raw: '[Vaswani et al](wiki/attention-is-all-you-need.md)',
-        target: 'Vaswani et al',
-        displayText: undefined,
+        target: 'wiki/attention-is-all-you-need.md',
+        displayText: 'Vaswani et al',
       },
     ]);
   });

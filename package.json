@@ -1,6 +1,6 @@
 {
-  "name": "llm-wiki-mcp",
-  "version": "0.2.0",
+  "name": "@anders045/llm-wiki-mcp",
+  "version": "0.2.1-nora.1",
   "description": "MCP server for building and maintaining LLM-powered knowledge wikis",
   "type": "module",
   "main": "dist/server.js",
@@ -24,7 +24,8 @@
     "format": "prettier --write src/ tests/",
     "format:check": "prettier --check src/ tests/",
     "type-check": "tsc --noEmit",
-    "prepublishOnly": "npm run type-check && npm run lint && npm test && npm run build"
+    "prepublishOnly": "npm run type-check && npm run lint && npm test && npm run build",
+    "test:stdio": "npm run build && node tests/runtime/stdio.mjs"
   },
   "keywords": [
     "mcp",
@@ -41,32 +42,35 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sumitroajiprabowo/llm-wiki-mcp.git"
+    "url": "git+https://github.com/Anders045/llm-wiki-mcp.git"
   },
-  "homepage": "https://github.com/sumitroajiprabowo/llm-wiki-mcp#readme",
+  "homepage": "https://github.com/Anders045/llm-wiki-mcp#readme",
   "bugs": {
-    "url": "https://github.com/sumitroajiprabowo/llm-wiki-mcp/issues"
+    "url": "https://github.com/Anders045/llm-wiki-mcp/issues"
   },
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "FORK-NOTES.md"
   ],
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "@cfworker/json-schema": "^4.1.1",
-    "@modelcontextprotocol/node": "^2.0.0-alpha.2",
-    "@modelcontextprotocol/server": "^2.0.0-alpha.2",
-    "glob": "^13.0.6",
-    "gray-matter": "^4.0.3",
-    "js-yaml": "^4.1.1",
-    "zod": "^4.3.6"
+    "@cfworker/json-schema": "4.1.1",
+    "@modelcontextprotocol/node": "2.0.0-alpha.2",
+    "@modelcontextprotocol/server": "2.0.0-alpha.2",
+    "glob": "13.0.6",
+    "gray-matter": "4.0.3",
+    "js-yaml": "4.1.1",
+    "proper-lockfile": "4.1.2",
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.5.2",
+    "@types/proper-lockfile": "4.1.4",
     "@vitest/coverage-v8": "^4.1.2",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
@@ -75,5 +79,6 @@
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.0",
     "vitest": "^4.1.2"
-  }
+  },
+  "private": true
 }

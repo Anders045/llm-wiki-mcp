@@ -56,6 +56,7 @@ describe('CRUD tools', () => {
     const updateResult = await handleUpdatePage(
       {
         path: 'wiki/test-page.md',
+        expectedVersion: readResult.version,
         content:
           '---\ntitle: Test Page\ntype: concept\ntags: [updated]\ncreated: 2026-04-06\nupdated: 2026-04-06\n---\n\n# Test Page\n\nUpdated.',
       },
@@ -66,7 +67,10 @@ describe('CRUD tools', () => {
     const readAgain = await handleReadPage({ path: 'wiki/test-page.md' }, wikiManager);
     expect(readAgain.content).toContain('Updated.');
 
-    const deleteResult = await handleDeletePage({ path: 'wiki/test-page.md' }, wikiManager);
+    const deleteResult = await handleDeletePage(
+      { path: 'wiki/test-page.md', expectedVersion: readAgain.version },
+      wikiManager,
+    );
     expect(deleteResult.success).toBe(true);
   });
 });

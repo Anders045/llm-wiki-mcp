@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { safePath } from '../utils/safe-path.js';
+import { listMarkdown } from '../core/page-catalog.js';
 import matter from 'gray-matter';
 import type { SearchResult, SearchOptions } from '../config/types.js';
 import type { SearchProvider } from './search-provider.js';
@@ -29,20 +30,20 @@ export class SimpleProvider implements SearchProvider {
    */
   async search(query: string, options: SearchOptions): Promise<SearchResult[]> {
     const { maxResults, wikiDir } = options;
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const terms = query.normalize('NFC').toLowerCase().split(/\s+/).filter(Boolean);
 
     if (terms.length === 0) return [];
 
-    const files = readdirSync(wikiDir).filter((f) => f.endsWith('.md'));
+    const files = listMarkdown(wikiDir);
     const scored: SearchResult[] = [];
 
     for (const file of files) {
-      const absPath = join(wikiDir, file);
+      const absPath = safePath(wikiDir, file);
       const raw = readFileSync(absPath, 'utf-8');
       const parsed = matter(raw);
       const title = (parsed.data.title as string) ?? file.replace('.md', '');
-      const body = parsed.content.toLowerCase();
-      const titleLower = title.toLowerCase();
+      const body = parsed.content.normalize('NFC').toLowerCase();
+      const titleLower = title.normalize('NFC').toLowerCase();
 
       let score = 0;
       let matchedSnippet = '';

@@ -30,7 +30,7 @@ describe('IndexManager', () => {
     const content = readFileSync(join(TEST_DIR, 'index.md'), 'utf-8');
     expect(content).toContain('# Wiki Index');
     expect(content).toContain('## Concepts');
-    expect(content).toContain('[[Attention Mechanism]]');
+    expect(content).toContain('[[wiki/attention-mechanism.md|Attention Mechanism]]');
     expect(content).toContain('Core mechanism for focusing on relevant input');
   });
 

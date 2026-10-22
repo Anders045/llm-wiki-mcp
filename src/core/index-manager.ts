@@ -1,6 +1,7 @@
 // src/core/index-manager.ts
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { safePath } from '../utils/safe-path.js';
+import { atomicWrite } from '../utils/atomic-write.js';
 import type { IndexEntry } from '../config/types.js';
 import type { LinkResolver } from './link-resolver.js';
 
@@ -34,7 +35,7 @@ export class IndexManager {
     vaultPath: string,
     private linkResolver: LinkResolver,
   ) {
-    this.indexPath = join(vaultPath, 'index.md');
+    this.indexPath = safePath(vaultPath, 'index.md');
   }
 
   /** Appends a new entry to the index and persists the file. */
@@ -77,8 +78,8 @@ export class IndexManager {
     // Format: - <link> — <summary> <!-- path: <relative-path> -->
     const pathCommentRegex = /<!--\s*path:\s*([^>]+?)\s*-->/;
     const summaryRegex = /^- .+? — (.+?)(?:\s*<!--.*-->)?$/;
-    const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/;
-    const mdlinkRegex = /\[([^\]]+)\]\(([^)]+)\)/;
+    const wikilinkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/;
+    const mdlinkRegex = /\[((?:\\.|[^\]\\])+)\]\(([^)]+)\)/;
 
     let currentType = '';
     // Invert CATEGORY_MAP so we can go from heading text back to page type
@@ -107,14 +108,14 @@ export class IndexManager {
 
       if (wikiMatch) {
         entries.push({
-          title: wikiMatch[1],
+          title: wikiMatch[2] ?? wikiMatch[1],
           path: storedPath,
           pageType: currentType,
           summary,
         });
       } else if (mdMatch) {
         entries.push({
-          title: mdMatch[1],
+          title: mdMatch[1].replace(/\\([\\[\]])/g, '$1'),
           path: storedPath || mdMatch[2],
           pageType: currentType,
           summary,
@@ -148,11 +149,11 @@ export class IndexManager {
 
       content += `\n## ${category}\n\n`;
       for (const entry of entries) {
-        const link = this.linkResolver.createLink(entry.title);
+        const link = this.linkResolver.createLink(entry.title, undefined, entry.path);
         content += `- ${link} — ${entry.summary} <!-- path: ${entry.path} -->\n`;
       }
     }
 
-    writeFileSync(this.indexPath, content, 'utf-8');
+    atomicWrite(this.indexPath, content);
   }
 }

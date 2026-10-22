@@ -1,5 +1,7 @@
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { extname, sep } from 'node:path';
+import { catalog } from '../core/page-catalog.js';
+import { validateSchemaPaths } from '../config/schema-loader.js';
 import type { WikiSchema } from '../config/types.js';
 import { safePath } from '../utils/safe-path.js';
 
@@ -32,23 +34,22 @@ export async function handleIngest(
   schema: WikiSchema,
 ): Promise<IngestOutput> {
   // safePath prevents path-traversal attacks (e.g. "../../etc/passwd")
+  validateSchemaPaths(vaultPath, schema);
   const absPath = safePath(vaultPath, input.source_path);
 
+  if (!absPath.startsWith(safePath(vaultPath, schema.paths.raw) + sep))
+    throw new Error('Source must be within the configured raw directory');
   if (!existsSync(absPath)) {
     throw new Error(`Source not found: ${input.source_path}`);
   }
 
-  const content = readFileSync(absPath, 'utf-8');
+  if (!['.md', '.markdown', '.txt'].includes(extname(absPath).toLowerCase()))
+    throw new Error(
+      'Ingest accepts Markdown or TXT; extract other formats with an external document tool first',
+    );
+  const content = new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(absPath));
 
-  // Collect existing wiki pages so the LLM can avoid creating duplicates
-  const wikiDir = join(vaultPath, schema.paths.wiki);
-  let existingPages: string[] = [];
-
-  if (existsSync(wikiDir)) {
-    existingPages = readdirSync(wikiDir)
-      .filter((f) => f.endsWith('.md'))
-      .map((f) => `${schema.paths.wiki}/${f}`);
-  }
+  const existingPages = catalog(vaultPath, schema.paths.wiki).map((page) => page.path);
 
   return {
     content,

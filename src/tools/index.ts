@@ -30,6 +30,15 @@ export function registerTools(server: McpServer, services: Services): void {
   const { wikiManager, linkResolver, searchProvider, schema, vaultPath } = services;
   // Pre-compute the absolute wiki directory used by search and lint tools
   const wikiDir = `${vaultPath}/${schema.paths.wiki}`;
+  server.registerTool(
+    'wiki_rebuild_index',
+    {
+      title: 'Rebuild Wiki Index',
+      description: 'Recover the derived index from Markdown pages without changing them',
+      inputSchema: z.object({}),
+    },
+    async () => toolResult(await wikiManager.rebuildIndex()),
+  );
 
   server.registerTool(
     'wiki_init',
@@ -43,8 +52,8 @@ export function registerTools(server: McpServer, services: Services): void {
       }),
     },
     async ({ path, name, linkStyle }) => {
-      const result = await handleInit({ path, name, linkStyle });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      const result = await handleInit({ path, name, linkStyle }, vaultPath);
+      return toolResult(result);
     },
   );
 
@@ -62,7 +71,7 @@ export function registerTools(server: McpServer, services: Services): void {
     },
     async ({ source_path }) => {
       const result = await handleIngest({ source_path }, vaultPath, schema);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResult(result);
     },
   );
 
@@ -75,15 +84,19 @@ export function registerTools(server: McpServer, services: Services): void {
       inputSchema: z.object({
         title: z.string().describe('Page title'),
         content: z.string().describe('Full markdown content including YAML frontmatter'),
+        directory: z
+          .string()
+          .optional()
+          .describe('Relative directory beneath wiki; up to four levels'),
         pageType: z
           .string()
           .optional()
           .describe('Page type: source, concept, entity, or comparison'),
       }),
     },
-    async ({ title, content, pageType }) => {
-      const result = await handleCreatePage({ title, content, pageType }, wikiManager);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    async ({ title, content, pageType, directory }) => {
+      const result = await handleCreatePage({ title, content, pageType, directory }, wikiManager);
+      return toolResult(result);
     },
   );
 
@@ -100,7 +113,7 @@ export function registerTools(server: McpServer, services: Services): void {
     async ({ title, path }) => {
       try {
         const result = await handleReadPage({ title, path }, wikiManager);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        return toolResult(result);
       } catch (err) {
         return {
           content: [{ type: 'text' as const, text: `Error: ${(err as Error).message}` }],
@@ -118,11 +131,15 @@ export function registerTools(server: McpServer, services: Services): void {
       inputSchema: z.object({
         path: z.string().describe('Path to the page, e.g. wiki/page.md'),
         content: z.string().describe('Full new markdown content including frontmatter'),
+        expectedVersion: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .describe('version returned by wiki_read_page'),
       }),
     },
-    async ({ path, content }) => {
-      const result = await handleUpdatePage({ path, content }, wikiManager);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    async ({ path, content, expectedVersion }) => {
+      const result = await handleUpdatePage({ path, content, expectedVersion }, wikiManager);
+      return toolResult(result);
     },
   );
 
@@ -133,11 +150,15 @@ export function registerTools(server: McpServer, services: Services): void {
       description: 'Delete a wiki page and report any broken links',
       inputSchema: z.object({
         path: z.string().describe('Path to the page to delete, e.g. wiki/page.md'),
+        expectedVersion: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .describe('version returned by wiki_read_page'),
       }),
     },
-    async ({ path }) => {
-      const result = await handleDeletePage({ path }, wikiManager);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    async ({ path, expectedVersion }) => {
+      const result = await handleDeletePage({ path, expectedVersion }, wikiManager);
+      return toolResult(result);
     },
   );
 
@@ -153,7 +174,7 @@ export function registerTools(server: McpServer, services: Services): void {
     },
     async ({ query, max_results }) => {
       const result = await handleSearch({ query, max_results }, searchProvider, wikiDir);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResult(result);
     },
   );
 
@@ -169,7 +190,14 @@ export function registerTools(server: McpServer, services: Services): void {
     },
     async ({ scope }) => {
       const result = await handleLint({ scope }, vaultPath, schema, linkResolver);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return toolResult(result);
     },
   );
+}
+
+function toolResult(result: object) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+    ...('success' in result && result.success === false ? { isError: true } : {}),
+  };
 }

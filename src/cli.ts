@@ -6,7 +6,7 @@ import { createServer } from './server.js';
 import { handleInit } from './tools/init.js';
 
 /** Semantic version surfaced by --version and the help banner. */
-const VERSION = '0.1.0';
+import { VERSION } from './version.js';
 
 /** Multi-line help text printed when the user passes --help. */
 const HELP = `llm-wiki-mcp v${VERSION}

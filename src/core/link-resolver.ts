@@ -1,75 +1,74 @@
-// src/core/link-resolver.ts
+import { posix } from 'node:path';
 import type { ParsedLink } from '../config/types.js';
+import { validateName } from './page-catalog.js';
 
-/** Matches `[[Target]]` or `[[Target|Display]]` wikilinks. */
-const WIKILINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-/** Matches standard `[text](url)` Markdown links. */
-const MDLINK_REGEX = /\[([^\]]+)\]\(([^)]+)\)/g;
-
-/**
- * Creates and parses inter-page links in either wikilink (`[[…]]`) or
- * standard Markdown (`[…](…)`) style, depending on user configuration.
- */
+/** Parse both link styles regardless of the preferred output style. */
 export class LinkResolver {
   constructor(
     private linkStyle: 'wikilink' | 'markdown',
-    /** Relative directory used as the base path when generating Markdown-style links. */
     private wikiDir: string,
   ) {}
 
-  /** Converts a page title into a URL-safe slug for use in file names and paths. */
   slugify(title: string): string {
-    return title
+    const normalized = title.normalize('NFC').trim();
+    // Preserve the established ASCII filenames; Unicode titles remain readable.
+    if ([...normalized].some((character) => character.codePointAt(0)! > 127)) {
+      validateName(normalized);
+      return normalized;
+    }
+    return normalized
       .toLowerCase()
-      .trim()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
   }
 
-  /** Generates a link string pointing to the given page title, using the configured link style. */
-  createLink(targetTitle: string, displayText?: string): string {
-    if (this.linkStyle === 'wikilink') {
-      if (displayText) {
-        return `[[${targetTitle}|${displayText}]]`;
-      }
-      return `[[${targetTitle}]]`;
-    }
-
-    const slug = this.slugify(targetTitle);
-    const path = `${this.wikiDir}/${slug}.md`;
+  createLink(
+    targetTitle: string,
+    displayText?: string,
+    targetPath?: string,
+    sourcePath = 'index.md',
+  ): string {
     const text = displayText ?? targetTitle;
-    return `[${text}](${path})`;
+    if (
+      this.linkStyle === 'wikilink' &&
+      ![...(targetPath ?? targetTitle)].some((character) => '#[]'.includes(character))
+    ) {
+      const target = targetPath ?? targetTitle;
+      return target === text ? `[[${target}]]` : `[[${target}|${text}]]`;
+    }
+    const path = targetPath ?? `${this.wikiDir}/${this.slugify(targetTitle)}.md`;
+    const relative = posix.relative(posix.dirname(sourcePath), path);
+    const encoded = relative
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/')
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29');
+    return `[${text.replace(/[\\[\]]/g, '\\$&')}](${encoded})`;
   }
 
-  /** Extracts all inter-page links from the given Markdown content. */
   parseLinks(content: string): ParsedLink[] {
     const links: ParsedLink[] = [];
-
-    if (this.linkStyle === 'wikilink') {
-      let match: RegExpExecArray | null;
-      const regex = new RegExp(WIKILINK_REGEX.source, 'g');
-      while ((match = regex.exec(content)) !== null) {
-        links.push({
-          raw: match[0],
-          target: match[1],
-          displayText: match[2] ?? undefined,
-        });
-      }
-    } else {
-      let match: RegExpExecArray | null;
-      // Fresh regex instance to avoid stale `lastIndex` from the module-level constant
-      const regex = new RegExp(MDLINK_REGEX.source, 'g');
-      while ((match = regex.exec(content)) !== null) {
-        links.push({
-          raw: match[0],
-          target: match[1],
-          displayText: undefined,
-        });
+    // Avoid interpreting examples in fenced and inline code as page links.
+    const text = content.replace(/```[^]*?```|~~~[^]*?~~~/g, '').replace(/`[^`\n]*`/g, '');
+    const pattern =
+      /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]|(?<!!)\[((?:\\.|[^\]\\\n])+)\]\((<[^>]+>|(?:[^\s()]|\([^()]*\))+)(?:\s+["'][^]*?["'])?\)/g;
+    for (const match of text.matchAll(pattern)) {
+      if (match[1] !== undefined) {
+        if (match[1].startsWith('#')) continue;
+        links.push({ raw: match[0], target: match[1], displayText: match[2] });
+      } else {
+        const target = match[4].replace(/^<|>$/g, '');
+        if (
+          /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target) ||
+          !target.split(/[?#]/)[0].endsWith('.md')
+        )
+          continue;
+        links.push({ raw: match[0], target, displayText: match[3].replace(/\\([\\[\]])/g, '$1') });
       }
     }
-
     return links;
   }
 }

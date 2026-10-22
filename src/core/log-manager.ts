@@ -1,6 +1,7 @@
 // src/core/log-manager.ts
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname } from 'node:path';
+import { safePath } from '../utils/safe-path.js';
 import type { LogEntry, LogFilter } from '../config/types.js';
 
 /** Markdown header written at the top of a new log file. */
@@ -18,11 +19,12 @@ export class LogManager {
   private logPath: string;
 
   constructor(vaultPath: string) {
-    this.logPath = join(vaultPath, 'log.md');
+    this.logPath = safePath(vaultPath, 'log.md');
   }
 
   /** Appends a single log entry to the end of the log file, creating the file if needed. */
   async append(entry: LogEntry): Promise<void> {
+    safePath(dirname(this.logPath), basename(this.logPath));
     if (!existsSync(this.logPath)) {
       writeFileSync(this.logPath, LOG_HEADER + '\n', 'utf-8');
     }
