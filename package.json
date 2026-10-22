@@ -52,7 +52,8 @@
     "dist",
     "README.md",
     "LICENSE",
-    "FORK-NOTES.md"
+    "FORK-NOTES.md",
+    "npm-shrinkwrap.json"
   ],
   "engines": {
     "node": ">=20"
