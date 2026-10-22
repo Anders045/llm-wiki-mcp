@@ -105,7 +105,8 @@ export class WikiManager {
     return parsed;
   }
 
-  private async writing<T>(operation: () => Promise<T>): Promise<T> {
+  private async writing<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    signal?.throwIfAborted();
     safePath(this.vaultPath, '.');
     const lockPath = safePath(this.vaultPath, '.wiki-write.lock');
     const release = await lockfile.lock(this.vaultPath, {
@@ -115,13 +116,21 @@ export class WikiManager {
       retries: { retries: 20, minTimeout: 50, maxTimeout: 250, factor: 1.2 },
     });
     try {
+      // A cancelled request may have waited for another process's lock.
+      signal?.throwIfAborted();
       return await operation();
     } finally {
       await release();
     }
   }
 
-  async createPage(title: string, content: string, pageType?: string, directory = '') {
+  async createPage(
+    title: string,
+    content: string,
+    pageType?: string,
+    directory = '',
+    signal?: AbortSignal,
+  ) {
     validateName(title);
     validateDirectory(directory);
     this.validateContent(content, title, pageType);
@@ -148,10 +157,12 @@ export class WikiManager {
       const absolute = this.pagePath(path);
       mkdirSync(dirname(absolute), { recursive: true });
       this.pagePath(path);
+      signal?.throwIfAborted();
+      // Commit point: after rename, finish derived maintenance even if cancelled.
       atomicWrite(absolute, content);
       await this.afterMutation('create', title, path);
       return { success: true, path, version: pageVersion(content), message: `Created: ${path}` };
-    });
+    }, signal);
   }
 
   async readPage(lookup: { title?: string; path?: string }): Promise<PageData> {
@@ -175,7 +186,7 @@ export class WikiManager {
     return page;
   }
 
-  async updatePage(path: string, content: string, expectedVersion?: string) {
+  async updatePage(path: string, content: string, expectedVersion?: string, signal?: AbortSignal) {
     this.pagePath(path);
     const parsed = this.validateContent(content);
     return this.writing(async () => {
@@ -187,6 +198,7 @@ export class WikiManager {
           comparisonKey(other.title) === comparisonKey(parsed.data.title),
       );
       if (collision) throw new Error(`Conflict: title already exists at ${collision.path}`);
+      signal?.throwIfAborted();
       atomicWrite(this.pagePath(page.path), content);
       await this.afterMutation('update', parsed.data.title, page.path);
       return {
@@ -195,10 +207,10 @@ export class WikiManager {
         version: pageVersion(content),
         message: `Updated: ${page.path}`,
       };
-    });
+    }, signal);
   }
 
-  async deletePage(path: string, expectedVersion?: string) {
+  async deletePage(path: string, expectedVersion?: string, signal?: AbortSignal) {
     this.pagePath(path);
     return this.writing(async () => {
       const page = this.current(path, expectedVersion);
@@ -216,10 +228,11 @@ export class WikiManager {
             }),
         )
         .map((p) => p.path);
+      signal?.throwIfAborted();
       unlinkSync(this.pagePath(page.path));
       await this.afterMutation('delete', page.title, page.path);
       return { success: true, message: `Deleted: ${page.path}`, brokenLinks };
-    });
+    }, signal);
   }
 
   private async afterMutation(operation: string, title: string, path: string): Promise<void> {
@@ -256,11 +269,11 @@ export class WikiManager {
     );
   }
 
-  async rebuildIndex(): Promise<{ success: boolean; message: string }> {
+  async rebuildIndex(signal?: AbortSignal): Promise<{ success: boolean; message: string }> {
     return this.writing(async () => {
       await this.rebuildUnlocked();
       return { success: true, message: 'Derived index rebuilt from Markdown pages' };
-    });
+    }, signal);
   }
 
   listWikiFiles(): string[] {

@@ -11,6 +11,7 @@ interface UpdatePageInput {
 export async function handleUpdatePage(
   input: UpdatePageInput,
   wikiManager: WikiManager,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; path: string; message: string }> {
-  return wikiManager.updatePage(input.path, input.content, input.expectedVersion);
+  return wikiManager.updatePage(input.path, input.content, input.expectedVersion, signal);
 }

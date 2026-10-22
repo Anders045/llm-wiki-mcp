@@ -28,14 +28,19 @@ afterEach(() => {
 describe('wiki_search handler', () => {
   it('returns search results', async () => {
     const provider = new SimpleProvider();
-    const result = await handleSearch({ query: 'attention' }, provider, WIKI_DIR);
+    const result = await handleSearch({ query: 'attention' }, provider, WIKI_DIR, 'wiki');
     expect(result.results.length).toBeGreaterThanOrEqual(1);
     expect(result.results[0].title).toBe('Attention');
   });
 
   it('respects max_results', async () => {
     const provider = new SimpleProvider();
-    const result = await handleSearch({ query: 'attention', max_results: 1 }, provider, WIKI_DIR);
+    const result = await handleSearch(
+      { query: 'attention', max_results: 1 },
+      provider,
+      WIKI_DIR,
+      'wiki',
+    );
     expect(result.results).toHaveLength(1);
   });
 });

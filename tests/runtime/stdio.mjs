@@ -27,6 +27,7 @@ function client() {
   let next = 0;
   let errors = '';
   const pending = new Map();
+  const responses = new Set();
   child.stderr.on('data', (chunk) => {
     errors += chunk;
   });
@@ -38,6 +39,7 @@ function client() {
       throw new Error(`Non-JSON stdout: ${line}`);
     }
     if (message.id !== undefined) {
+      responses.add(message.id);
       const callbacks = pending.get(message.id);
       pending.delete(message.id);
       if (message.error) callbacks?.reject(new Error(JSON.stringify(message.error)));
@@ -69,6 +71,21 @@ function client() {
   return {
     child,
     request,
+    responses,
+    get lastRequestId() {
+      return next;
+    },
+    cancel(id) {
+      child.stdin.write(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'notifications/cancelled',
+          params: { requestId: id, reason: 'Synthetic cancellation regression' },
+        }) + '\n',
+      );
+      pending.get(id)?.reject(new Error('Cancelled locally'));
+      pending.delete(id);
+    },
     async init() {
       const response = await request('initialize', {
         protocolVersion: '2025-11-25',
@@ -113,6 +130,68 @@ try {
   const a = client();
   const b = client();
   await Promise.all([a.init(), b.init()]);
+  data(await a.call('wiki_create_page', { title: '取消基页', content: page('取消基页') }));
+  const beforeCancel = data(await a.call('wiki_read_page', { title: '取消基页' }));
+  for (const [name, args] of [
+    ['wiki_create_page', { title: '取消验收', content: page('取消验收') }],
+    [
+      'wiki_update_page',
+      {
+        path: beforeCancel.path,
+        content: page('取消基页', 'should not save'),
+        expectedVersion: beforeCancel.version,
+      },
+    ],
+    ['wiki_delete_page', { path: beforeCancel.path, expectedVersion: beforeCancel.version }],
+    ['wiki_rebuild_index', {}],
+  ]) {
+    if (name === 'wiki_rebuild_index')
+      writeFileSync(join(vault, 'index.md'), 'cancelled rebuild keeps this');
+    const indexBefore = readFileSync(join(vault, 'index.md'), 'utf8');
+    const logBefore = readFileSync(join(vault, 'log.md'), 'utf8');
+    mkdirSync(join(vault, '.wiki-write.lock'));
+    const queued = a.call(name, args).catch((error) => error);
+    const requestId = a.lastRequestId;
+    await delay(300);
+    a.cancel(requestId);
+    await delay(300);
+    rmSync(join(vault, '.wiki-write.lock'), { recursive: true });
+    await delay(1200);
+    await queued;
+    assert.equal(
+      existsSync(join(vault, 'wiki/取消验收.md')),
+      false,
+      `${name} committed after cancellation`,
+    );
+    assert.equal(
+      readFileSync(join(vault, beforeCancel.path), 'utf8'),
+      beforeCancel.content,
+      `${name} changed the page after cancellation`,
+    );
+    assert.equal(
+      readFileSync(join(vault, 'index.md'), 'utf8'),
+      indexBefore,
+      `${name} changed the index after cancellation`,
+    );
+    assert.equal(
+      readFileSync(join(vault, 'log.md'), 'utf8'),
+      logBefore,
+      `${name} changed the log after cancellation`,
+    );
+    assert.equal(
+      existsSync(join(vault, '.wiki-write.lock')),
+      false,
+      `${name} leaked the acquired lock`,
+    );
+    assert.equal(
+      a.responses.has(requestId),
+      false,
+      'The native SDK should suppress a cancelled response',
+    );
+  }
+  console.log(
+    'PASS native MCP queued cancellation: create/update/delete/rebuild preserve page/index/log and release the lock',
+  );
   const tools = await a.request('tools/list');
   assert.equal(
     tools.tools
@@ -135,9 +214,11 @@ try {
     }),
   );
   const original = data(await a.call('wiki_read_page', { title: '系统思维' }));
+  const found = data(await a.call('wiki_search', { query: '系统思维' })).results[0];
+  assert.equal(found.path, 'wiki/阅读笔记/系统思维.md');
   assert.equal(
-    data(await a.call('wiki_search', { query: '系统思维' })).results[0].path,
-    '阅读笔记/系统思维.md',
+    data(await a.call('wiki_read_page', { path: found.path })).content,
+    original.content,
   );
   assert.deepEqual(data(await a.call('wiki_lint')).broken_links, []);
   assert.equal(

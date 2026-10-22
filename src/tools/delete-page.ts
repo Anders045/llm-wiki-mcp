@@ -13,6 +13,7 @@ interface DeletePageInput {
 export async function handleDeletePage(
   input: DeletePageInput,
   wikiManager: WikiManager,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; message: string; brokenLinks: string[] }> {
-  return wikiManager.deletePage(input.path, input.expectedVersion);
+  return wikiManager.deletePage(input.path, input.expectedVersion, signal);
 }

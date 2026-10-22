@@ -12,6 +12,13 @@ interface CreatePageInput {
 export async function handleCreatePage(
   input: CreatePageInput,
   wikiManager: WikiManager,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; path: string; message: string }> {
-  return wikiManager.createPage(input.title, input.content, input.pageType, input.directory);
+  return wikiManager.createPage(
+    input.title,
+    input.content,
+    input.pageType,
+    input.directory,
+    signal,
+  );
 }

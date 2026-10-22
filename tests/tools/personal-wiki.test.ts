@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DEFAULT_SCHEMA } from '../../src/config/types.js';
@@ -12,6 +20,8 @@ import { handleIngest } from '../../src/tools/ingest.js';
 import { SimpleProvider } from '../../src/search/simple-provider.js';
 import { handleInit } from '../../src/tools/init.js';
 import { loadSchema } from '../../src/config/schema-loader.js';
+import { handleSearch } from '../../src/tools/search.js';
+import lockfile from 'proper-lockfile';
 
 let vault: string;
 let manager: WikiManager;
@@ -30,6 +40,36 @@ beforeEach(() => {
 afterEach(() => rmSync(vault, { recursive: true, force: true }));
 
 describe('personal wiki public operations', () => {
+  it('does not commit a queued write after cancellation and releases an acquired lock', async () => {
+    const held = await lockfile.lock(vault, { lockfilePath: join(vault, '.wiki-write.lock') });
+    const controller = new AbortController();
+    const pending = manager.createPage(
+      '取消验收',
+      page('取消验收'),
+      undefined,
+      '',
+      controller.signal,
+    );
+    controller.abort(new Error('Synthetic request cancellation'));
+    await held();
+    await expect(pending).rejects.toThrow(/cancellation/);
+    expect(manager.listWikiFiles()).toEqual([]);
+    expect(existsSync(join(vault, '.wiki-write.lock'))).toBe(false);
+    expect(existsSync(join(vault, 'index.md'))).toBe(false);
+  });
+
+  it('returns a public search path that can be reused directly for reading', async () => {
+    await manager.createPage('搜索复用', page('搜索复用'), 'concept', '笔记');
+    const result = await handleSearch(
+      { query: '搜索复用' },
+      new SimpleProvider(),
+      join(vault, 'wiki'),
+      'wiki',
+    );
+    expect((await manager.readPage({ path: result.results[0].path })).frontmatter.title).toBe(
+      '搜索复用',
+    );
+  });
   it('preserves Chinese spaces/punctuation and resolves encoded Markdown filenames', async () => {
     const title = '阅读 共识（①）#问题[甲]';
     await manager.createPage(title, page(title));
@@ -214,4 +254,24 @@ describe('personal wiki public operations', () => {
     await manager.rebuildIndex();
     expect((await index.read())[0].title).toBe('新题');
   });
+
+  it.each(['新[标题]', '新标题]'])(
+    'preserves updated display title %s while the existing filename stays unchanged',
+    async (title) => {
+      await manager.createPage('原题', page('原题'));
+      const original = await manager.readPage({ title: '原题' });
+      const updated = page(title, '更新后的正文');
+      await manager.updatePage(original.path, updated, original.version);
+
+      expect((await index.read())[0]).toMatchObject({ title, path: original.path });
+      expect((await manager.readPage({ title })).content).toBe(updated);
+      expect(manager.listWikiFiles()).toEqual([original.path]);
+      const generated = readFileSync(join(vault, 'index.md'), 'utf8');
+      expect(generated).toContain('\\]');
+      expect(resolver.parseLinks(generated)[0].displayText).toBe(title);
+      expect((await handleLint({}, vault, DEFAULT_SCHEMA, resolver)).stale_index_entries).toEqual(
+        [],
+      );
+    },
+  );
 });

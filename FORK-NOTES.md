@@ -4,7 +4,7 @@ This private installation build is `@anders045/llm-wiki-mcp@0.2.1-nora.1`, based
 
 ## Scope and installation
 
-Use a reviewed local tarball and its recorded SHA-256. Extract it into the fixed program version directory, run `npm ci --omit=dev --ignore-scripts` inside the extracted package, then use a fixed Node executable with `dist/cli.js --vault /absolute/vault --transport stdio`. Do not use the upstream npm package or `@latest` to obtain these changes. The fork keeps the upstream HTTP code, but this build is intended and tested only for stdio; HTTP and QMD have not been accepted for the personal vault. Search explicitly uses the simple local provider, regardless of executables in PATH.
+Use a reviewed local tarball and its recorded SHA-256. Extract it into the fixed program version directory, run `npm ci --omit=dev --ignore-scripts` inside the extracted package, then use a fixed Node executable with `dist/cli.js --vault /absolute/vault --transport stdio`. Do not use the upstream npm package or `@latest` to obtain these changes. The fork keeps the upstream HTTP code, but this build is intended and tested only for stdio; HTTP and QMD have not been accepted for the personal vault. Search explicitly uses the simple local provider, regardless of executables in PATH. Public search results use vault-relative paths that can be passed directly to page reads and updates.
 
 Do not use `npm install <tarball>` as the fixed deployment procedure: in the tested npm 11 environment that nested install re-resolved transitive dependencies. Extracting the package and running `npm ci` makes its shrinkwrap the root installation lock.
 
@@ -36,6 +36,8 @@ npm pack
 ## Saving, conflicts and recovery
 
 Every page mutation and index rebuild uses [proper-lockfile](https://github.com/moxystudio/node-proper-lockfile) `4.1.2`, with one `.wiki-write.lock` directory inside the vault. It retries contention for a bounded interval and then returns an error. The lock heartbeat is two seconds; an abandoned lock becomes recoverable after ten seconds. All writer processes must use the same fork settings and the same physical vault. Do not remove a lock while a writer is alive. A filesystem lock protects cooperating processes; it does not make raw files immutable to other programs running under the same account.
+
+The SDK's native request cancellation signal is checked before waiting for the write lock, after acquiring it, and immediately before a page replacement or deletion. A queued cancelled write cannot commit and releases any lock it later acquires. Lock acquisition itself uses the library's bounded retry interval. The commit point is the page rename or deletion; cancellation received afterward does not roll back that change, and derived maintenance is allowed to finish. The SDK may suppress a cancelled response, so read the current page before retrying an operation whose commit state is unknown.
 
 A page is validated before being written to a temporary sibling, flushed, closed and renamed into place. The temporary file is mode 0600. This provides a single-file atomic replacement; page, index and log are not a multi-file transaction. A crash may leave a complete new page with an old index, no log entry, or an unused `.wiki-write-*.tmp` sibling. Temporary files are not wiki pages. Review and remove crash leftovers only after all writers have stopped.
 

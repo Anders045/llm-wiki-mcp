@@ -37,7 +37,7 @@ export function registerTools(server: McpServer, services: Services): void {
       description: 'Recover the derived index from Markdown pages without changing them',
       inputSchema: z.object({}),
     },
-    async () => toolResult(await wikiManager.rebuildIndex()),
+    async (_input, context) => toolResult(await wikiManager.rebuildIndex(context.mcpReq.signal)),
   );
 
   server.registerTool(
@@ -51,7 +51,8 @@ export function registerTools(server: McpServer, services: Services): void {
         linkStyle: z.enum(['wikilink', 'markdown']).optional().describe('Link format'),
       }),
     },
-    async ({ path, name, linkStyle }) => {
+    async ({ path, name, linkStyle }, context) => {
+      context.mcpReq.signal.throwIfAborted();
       const result = await handleInit({ path, name, linkStyle }, vaultPath);
       return toolResult(result);
     },
@@ -94,8 +95,12 @@ export function registerTools(server: McpServer, services: Services): void {
           .describe('Page type: source, concept, entity, or comparison'),
       }),
     },
-    async ({ title, content, pageType, directory }) => {
-      const result = await handleCreatePage({ title, content, pageType, directory }, wikiManager);
+    async ({ title, content, pageType, directory }, context) => {
+      const result = await handleCreatePage(
+        { title, content, pageType, directory },
+        wikiManager,
+        context.mcpReq.signal,
+      );
       return toolResult(result);
     },
   );
@@ -137,8 +142,12 @@ export function registerTools(server: McpServer, services: Services): void {
           .describe('version returned by wiki_read_page'),
       }),
     },
-    async ({ path, content, expectedVersion }) => {
-      const result = await handleUpdatePage({ path, content, expectedVersion }, wikiManager);
+    async ({ path, content, expectedVersion }, context) => {
+      const result = await handleUpdatePage(
+        { path, content, expectedVersion },
+        wikiManager,
+        context.mcpReq.signal,
+      );
       return toolResult(result);
     },
   );
@@ -156,8 +165,12 @@ export function registerTools(server: McpServer, services: Services): void {
           .describe('version returned by wiki_read_page'),
       }),
     },
-    async ({ path, expectedVersion }) => {
-      const result = await handleDeletePage({ path, expectedVersion }, wikiManager);
+    async ({ path, expectedVersion }, context) => {
+      const result = await handleDeletePage(
+        { path, expectedVersion },
+        wikiManager,
+        context.mcpReq.signal,
+      );
       return toolResult(result);
     },
   );
@@ -173,7 +186,12 @@ export function registerTools(server: McpServer, services: Services): void {
       }),
     },
     async ({ query, max_results }) => {
-      const result = await handleSearch({ query, max_results }, searchProvider, wikiDir);
+      const result = await handleSearch(
+        { query, max_results },
+        searchProvider,
+        wikiDir,
+        schema.paths.wiki,
+      );
       return toolResult(result);
     },
   );

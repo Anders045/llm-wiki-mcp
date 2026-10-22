@@ -31,11 +31,11 @@ export class LinkResolver {
     sourcePath = 'index.md',
   ): string {
     const text = displayText ?? targetTitle;
+    const target = targetPath ?? targetTitle;
     if (
       this.linkStyle === 'wikilink' &&
-      ![...(targetPath ?? targetTitle)].some((character) => '#[]'.includes(character))
+      ![...target, ...text].some((character) => '#[]|'.includes(character))
     ) {
-      const target = targetPath ?? targetTitle;
       return target === text ? `[[${target}]]` : `[[${target}|${text}]]`;
     }
     const path = targetPath ?? `${this.wikiDir}/${this.slugify(targetTitle)}.md`;
