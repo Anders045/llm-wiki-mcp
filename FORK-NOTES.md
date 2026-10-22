@@ -4,7 +4,9 @@ This private installation build is `@anders045/llm-wiki-mcp@0.2.1-nora.1`, based
 
 ## Scope and installation
 
-Use a reviewed local tarball and its recorded SHA-256, with a fixed Node executable and `dist/cli.js --vault /absolute/vault --transport stdio`. Do not use the upstream npm package or `@latest` to obtain these changes. The fork keeps the upstream HTTP code, but this build is intended and tested only for stdio; HTTP and QMD have not been accepted for the personal vault. Search explicitly uses the simple local provider, regardless of executables in PATH.
+Use a reviewed local tarball and its recorded SHA-256. Extract it into the fixed program version directory, run `npm ci --omit=dev --ignore-scripts` inside the extracted package, then use a fixed Node executable with `dist/cli.js --vault /absolute/vault --transport stdio`. Do not use the upstream npm package or `@latest` to obtain these changes. The fork keeps the upstream HTTP code, but this build is intended and tested only for stdio; HTTP and QMD have not been accepted for the personal vault. Search explicitly uses the simple local provider, regardless of executables in PATH.
+
+Do not use `npm install <tarball>` as the fixed deployment procedure: in the tested npm 11 environment that nested install re-resolved transitive dependencies. Extracting the package and running `npm ci` makes its shrinkwrap the root installation lock.
 
 Build and verify from the pinned fork commit:
 
